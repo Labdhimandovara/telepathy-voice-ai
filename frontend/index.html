@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telepathy - AI Voice Emotion Recognition</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover {
+            background: #f8f9ff;
+            border-color: #764ba2;
+        }
+        .upload-icon { font-size: 3em; margin-bottom: 10px; }
+        input[type="file"] { display: none; }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            display: none;
+        }
+        .result.show { display: block; }
+        .emotion {
+            font-size: 2em;
+            font-weight: bold;
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .confidence {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .prob-bar {
+            margin: 10px 0;
+        }
+        .prob-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        .bar-container {
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            height: 25px;
+        }
+        .bar {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            color: white;
+            font-size: 0.8em;
+        }
+        .loading {
+            text-align: center;
+            color: #667eea;
+            display: none;
+        }
+        .loading.show { display: block; }
+        .error {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .emoji {
+            font-size: 3em;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #999;
+            font-size: 0.9em;
+        }
+        .api-status {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+        .api-status.online {
+            background: #d4edda;
+            color: #155724;
+        }
+        .api-status.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>�� Telepathy</h1>
+        <p class="subtitle">AI-Powered Voice Emotion Recognition</p>
+        
+        <div id="apiStatus" class="api-status">
+            <span id="statusText">Checking API...</span>
+        </div>
+        
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">🎤</div>
+            <p>Click to upload audio file</p>
+            <p style="font-size: 0.9em; color: #999; margin-top: 10px;">Supports WAV, MP3, OGG formats</p>
+        </div>
+        
+        <input type="file" id="fileInput" accept="audio/*" onchange="uploadFile()">
+        
+        <div class="loading" id="loading">
+            <p>🔮 Analyzing emotions...</p>
+        </div>
+        
+        <div class="result" id="result">
+            <div class="emoji" id="emoji"></div>
+            <div class="emotion" id="emotion"></div>
+            <div class="confidence" id="confidence"></div>
+            
+            <h3 style="margin-bottom: 15px;">Probability Distribution:</h3>
+            <div id="probabilities"></div>
+        </div>
+        
+        <p class="error" id="error"></p>
+        
+        <div class="footer">
+            <p>Built with ❤️ using AI | <a href="https://github.com/Labdhimandovara/telepathy-voice-ai" style="color: #667eea;">GitHub</a></p>
+        </div>
+    </div>
+    
+    <script>
+        // API endpoint - will be updated after Render deployment
+        const API_URL = 'API_URL_PLACEHOLDER';
+        
+        const emotionEmojis = {
+            'happy': '😊',
+            'sad': '😢',
+            'angry': '😠',
+            'fearful': '😨',
+            'neutral': '😐'
+        };
+        
+        // Check API health on load
+        async function checkAPIHealth() {
+            const statusEl = document.getElementById('apiStatus');
+            const statusText = document.getElementById('statusText');
+            
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (response.ok) {
+                    statusEl.className = 'api-status online';
+                    statusText.textContent = '✅ API Online';
+                } else {
+                    throw new Error('API unavailable');
+                }
+            } catch (error) {
+                statusEl.className = 'api-status offline';
+                statusText.textContent = '⚠️ API Offline (waking up...)';
+            }
+        }
+        
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+            
+            // Show loading
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('result').classList.remove('show');
+            document.getElementById('error').textContent = '';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Prediction failed');
+                }
+                
+                const data = await response.json();
+                displayResult(data);
+                
+            } catch (error) {
+                document.getElementById('error').textContent = '❌ Error: ' + error.message + ' (API may be starting up, try again in 30 seconds)';
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+        
+        function displayResult(data) {
+            document.getElementById('result').classList.add('show');
+            
+            // Emotion and emoji
+            const emotion = data.emotion;
+            document.getElementById('emoji').textContent = emotionEmojis[emotion] || '🎭';
+            document.getElementById('emotion').textContent = emotion.toUpperCase();
+            document.getElementById('confidence').textContent = 
+                `Confidence: ${(data.confidence * 100).toFixed(2)}%`;
+            
+            // Probabilities
+            const probsContainer = document.getElementById('probabilities');
+            probsContainer.innerHTML = '';
+            
+            const probs = data.all_probabilities;
+            const sortedEmotions = Object.keys(probs).sort((a, b) => probs[b] - probs[a]);
+            
+            sortedEmotions.forEach(emotion => {
+                const prob = probs[emotion];
+                const percentage = (prob * 100).toFixed(2);
+                
+                const barDiv = document.createElement('div');
+                barDiv.className = 'prob-bar';
+                barDiv.innerHTML = `
+                    <div class="prob-label">
+                        <span>${emotion}</span>
+                        <span>${percentage}%</span>
+                    </div>
+                    <div class="bar-container">
+                        <div class="bar" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                probsContainer.appendChild(barDiv);
+            });
+        }
+        
+        // Check API on load
+        checkAPIHealth();
+        
+        // Recheck every 30 seconds
+        setInterval(checkAPIHealth, 30000);
+    </script>
+</body>
+</html>
