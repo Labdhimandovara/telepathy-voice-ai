@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create directory for models if they don't exist
-RUN mkdir -p /app/models
+# Train the model during build
+RUN python create_sample_data.py && python train_simple.py
 
 # Expose port
 EXPOSE 8000
